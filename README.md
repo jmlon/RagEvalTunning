@@ -9,10 +9,12 @@ ground truth with an LLM judge.
 - Put source PDFs and associated questions in `./inputs/`. E.g., `doc1.pdf` and `doc1.json`.
 - Configure systems/models in `./config.yaml`.
 - Create your `.env` from the template and set the API key:
+
   ```sh
   cp .env-example .env
   # then edit .env and replace sk-or-XXXXX with your real OpenRouter API key
   ```
+
   Set `OPENROUTER_API_KEY` (and optionally `OPENROUTER_ENDPOINT`) in `.env`.
 - For the rerankers, set `COHERE_API_KEY` in `.env`.
 - For `graph-rag`, start a local Neo4j first: `bash scripts/neo4j.sh up` (data persists in a Docker volume; `down` to stop, `reset` to wipe). Override the password with `NEO4J_LOCAL_PASSWORD`.
@@ -32,6 +34,7 @@ uv run python -m ragbench.cli index -s llm-wiki --force
 uv run python -m ragbench.cli run -s simple-rag
 uv run python -m ragbench.cli run -s hybrid-rag
 uv run python -m ragbench.cli run -s llm-wiki
+uv run python -m ragbench.cli run -s graph-rag
 
 # Tune one system's params (grid-search the values in its config `tuning:` block);
 # picks the best (max score, tie-break lower query cost) and updates config.yaml:
@@ -62,15 +65,24 @@ maps directly to the `uv run python -m ragbench.cli <subcommand>` calls above.
 API keys are read from `.env`; `inputs/` and `outputs/` are mounted into the
 container at `/app/inputs` and `/app/outputs`.
 
+The `--network`/`-e` flags below let the container reach Neo4j for `graph-rag`
+(see the Neo4j note at the end); they're harmless for the other systems, so the
+examples include them on every command for copy-paste safety. `report` only
+reads files and never connects to Neo4j, so it omits them.
+
 ```sh
 # Index: ingest PDFs from ./inputs and build each system's index under ./outputs
 docker run --rm --env-file .env \
+  --network ragbench-net \
+  -e NEO4J_LOCAL_URI=bolt://ragbench-neo4j:7687 \
   -v "$(pwd)/inputs:/app/inputs" \
   -v "$(pwd)/outputs:/app/outputs" \
   ragbench index
 
 # Evaluate: answer + judge every question
 docker run --rm --env-file .env \
+  --network ragbench-net \
+  -e NEO4J_LOCAL_URI=bolt://ragbench-neo4j:7687 \
   -v "$(pwd)/inputs:/app/inputs" \
   -v "$(pwd)/outputs:/app/outputs" \
   ragbench run
@@ -92,11 +104,15 @@ docker run --rm --env-file .env \
 ```
 
 Notes:
+
 - `config.yaml` is baked into the image at build time. To iterate on it without
   rebuilding, mount it over the copy in the image:
   `-v "$(pwd)/config.yaml:/app/config.yaml"`.
 - `graph-rag` needs a reachable Neo4j. The bundled `scripts/neo4j.sh` starts one
-  on the host; from inside the container reach it via `--add-host` or by sharing
-  the host network (`--network host`) and pointing the Neo4j URI at the host.
-
-
+  and attaches it to the user-defined network `ragbench-net`. The `docker run`
+  examples above join that network (`--network ragbench-net`) and point the URI
+  at the container name (`-e NEO4J_LOCAL_URI=bolt://ragbench-neo4j:7687`).
+  `NEO4J_LOCAL_URI` overrides `neo4j_uri` in `config.yaml`, which stays
+  `bolt://localhost:7687` for host runs (`uv run …`). Do **not** put
+  `NEO4J_LOCAL_URI` in `.env`: it's loaded on host runs too and would break them.
+  On Linux, `--network host` with the default localhost URI also works.

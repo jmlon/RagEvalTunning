@@ -5,14 +5,20 @@
 # the container does NOT lose the graph. Use `reset` to wipe the database.
 #
 # Connection (used by ragbench graph-rag, see config.yaml):
-#   bolt://localhost:7687   user: neo4j   password: $NEO4J_LOCAL_PASSWORD (default hola1234)
+#   Host:      bolt://localhost:7687              (published ports)
+#   Container: bolt://ragbench-neo4j:7687         (shared network 'ragbench-net')
 #   Browser UI: http://localhost:7474
+# The container also joins the user-defined network 'ragbench-net' so other
+# containers (e.g. the ragbench image) can reach it by name; pass that name and
+# set NEO4J_LOCAL_URI=bolt://ragbench-neo4j:7687 on their `docker run`.
+# Auth is off so any username/password the client sends is accepted/ignored.
+# Do NOT expose ports 7474/7687 beyond localhost with auth disabled.
 set -euo pipefail
 
 CONTAINER="ragbench-neo4j"
 VOLUME="ragbench_neo4j_data"
+NETWORK="ragbench-net"
 IMAGE="neo4j:5"
-PASSWORD="${NEO4J_LOCAL_PASSWORD:-neo4j}"
 
 cmd="${1:-up}"
 
@@ -23,19 +29,21 @@ case "$cmd" in
       exit 0
     fi
     docker volume create "${VOLUME}" >/dev/null
-    echo "[neo4j] starting ${CONTAINER} (${IMAGE}); data volume=${VOLUME}"
+    docker network inspect "${NETWORK}" >/dev/null 2>&1 || docker network create "${NETWORK}" >/dev/null
+    echo "[neo4j] starting ${CONTAINER} (${IMAGE}); data volume=${VOLUME}; network=${NETWORK}"
     docker run -d --rm \
       --name "${CONTAINER}" \
+      --network "${NETWORK}" \
       -p 7474:7474 -p 7687:7687 \
       --volume="${VOLUME}:/data" \
-      -e NEO4J_AUTH="neo4j/${PASSWORD}" \
+      -e NEO4J_AUTH="none" \
       -e NEO4J_PLUGINS='["apoc"]' \
       -e NEO4J_dbms_security_procedures_unrestricted='apoc.*' \
       -e NEO4J_dbms_security_procedures_allowlist='apoc.*' \
       "${IMAGE}" >/dev/null
     echo "[neo4j] waiting for bolt to accept connections..."
     for _ in $(seq 1 60); do
-      if docker exec "${CONTAINER}" cypher-shell -u neo4j -p "${PASSWORD}" "RETURN 1;" >/dev/null 2>&1; then
+      if docker exec "${CONTAINER}" cypher-shell --non-interactive -u neo4j -p ignored "RETURN 1;" >/dev/null 2>&1; then
         echo "[neo4j] ready at bolt://localhost:7687 (UI http://localhost:7474)"
         exit 0
       fi

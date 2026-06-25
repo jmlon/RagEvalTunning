@@ -11,4 +11,5 @@ wheels/
 .env
 
 test_questions.json
+outputs/gpt*
 

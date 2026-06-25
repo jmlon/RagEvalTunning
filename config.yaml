@@ -9,15 +9,21 @@ global:
   # Seed for randomizing aggregated question order (reproducible). Remove for random.
   seed: 42
   # Parallel worker threads for `run` (questions answered + judged concurrently). 1 = serial.
-  workers: 4
+  workers: 8
   defaults:
-    llm_model: openai/gpt-4o-mini
+    llm_model: openai/gpt-4.1-nano
     embedding_model: openai/text-embedding-3-small
   # Optional per-model pricing (USD per 1M tokens) for cost estimation.
   pricing:
     openai/gpt-4o-mini:
       input: 0.15
       output: 0.60
+    openai/gpt-4.1-nano:
+      input: 0.10
+      output: 0.40
+    openai/gpt-5.4-nano:
+      input: 0.20
+      output: 1.25
     # Embedding models: cost is per-input-token (output unused).
     openai/text-embedding-3-small:
       input: 0.02
@@ -29,7 +35,6 @@ global:
 systems:
   simple-rag:
     enabled: true
-    llm_model: openai/gpt-4o-mini
     embedding_model: openai/text-embedding-3-small
     chunk_size: 400
     chunk_overlap: 150
@@ -43,7 +48,6 @@ systems:
         top_k: [15]
   simple-rag-reranker:
     enabled: true
-    llm_model: openai/gpt-4o-mini
     embedding_model: openai/text-embedding-3-small   # MUST match simple-rag (shared vector space)
     source_system: simple-rag   # reuses this system's Chroma index (no own indexing)
     retrieve_k: 40              # candidates fetched from the shared index before reranking
@@ -57,7 +61,6 @@ systems:
         top_k: [12]
   hybrid-rag:
     enabled: true
-    llm_model: openai/gpt-4o-mini
     embedding_model: openai/text-embedding-3-small
     chunk_size: 400        # matches simple-rag for fair comparison (notebook used 400)
     chunk_overlap: 150
@@ -74,7 +77,6 @@ systems:
         # To also tune chunking, add chunk_size/chunk_overlap here AND to index_params.
   hybrid-rag-reranker:
     enabled: true
-    llm_model: openai/gpt-4o-mini
     embedding_model: openai/text-embedding-3-small   # MUST match hybrid-rag (shared vector space)
     source_system: hybrid-rag   # reuses this system's Chroma index (no own indexing)
     retrieve_k: 40              # candidates per base retriever before fusion + reranking
@@ -85,12 +87,14 @@ systems:
     temperature: 0.0
   graph-rag:
     enabled: true
-    llm_model: openai/gpt-4o-mini
     embedding_model: openai/text-embedding-3-small
     # Local Neo4j (docker; see scripts/neo4j.sh). Distinct from any cloud NEO4J_URI.
+    # Host runs use this default; containerized runs override it via $NEO4J_LOCAL_URI
+    # (e.g. bolt://ragbench-neo4j:7687 on the shared docker network).
     neo4j_uri: bolt://localhost:7687
+    neo4j_uri_env: NEO4J_LOCAL_URI
     neo4j_username: neo4j
-    neo4j_password_env: NEO4J_LOCAL_PASSWORD   # default 'hola1234' if unset (matches scripts/neo4j.sh)
+    neo4j_password_env: NEO4J_LOCAL_PASSWORD   # auth disabled in scripts/neo4j.sh (NEO4J_AUTH=none); value is ignored
     # Larger chunks than the vector systems: graph extraction is one LLM call per
     # chunk (slow), and benefits from more context per call.
     chunk_size: 3000
@@ -101,7 +105,7 @@ systems:
     temperature: 0.0
   llm-wiki:
     enabled: true
-    llm_model: openai/gpt-4o-mini   # no embeddings used (pure form, no vector DB)
+    # no embeddings used (pure form, no vector DB); llm_model inherited from global defaults
     chunk_size: 3000        # larger chunks -> fewer extraction calls
     chunk_overlap: 300
     route_max_pages: 8      # max pages the router may pick from index.md

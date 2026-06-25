@@ -65,7 +65,13 @@ LIMIT $limit
 class GraphRAGSystem(RAGSystem):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.neo4j_uri = self.system_cfg.get("neo4j_uri", "bolt://localhost:7687")
+        # URI: env override (set when ragbench runs in a container on a shared
+        # docker network, e.g. bolt://ragbench-neo4j:7687) wins over the config
+        # default (bolt://localhost:7687, used for host runs).
+        uri_env = self.system_cfg.get("neo4j_uri_env", "NEO4J_LOCAL_URI")
+        self.neo4j_uri = os.environ.get(uri_env) or self.system_cfg.get(
+            "neo4j_uri", "bolt://localhost:7687"
+        )
         self.neo4j_username = self.system_cfg.get("neo4j_username", "neo4j")
         pw_env = self.system_cfg.get("neo4j_password_env", "NEO4J_LOCAL_PASSWORD")
         self.neo4j_password = os.environ.get(pw_env, "hola1234")
