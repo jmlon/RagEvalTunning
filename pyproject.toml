@@ -1,0 +1,27 @@
+[project]
+name = "ragevaluator"
+version = "0.1.0"
+description = "Application for a comparative evaluation of different RAG systems"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "chromadb>=0.5",
+    "langchain>=0.3",
+    "langchain-chroma>=0.1",
+    "langchain-cohere>=0.3",
+    "langchain-community>=0.3",
+    "langchain-experimental>=0.3.4",
+    "langchain-neo4j>=0.4.0",
+    "langchain-openai>=0.2",
+    "neo4j>=5.28.4",
+    "pydantic>=2",
+    "pypdf>=4.0",
+    "python-dotenv>=1.0",
+    "pyyaml>=6",
+    "rank-bm25>=0.2",
+    "scikit-learn>=1.4",
+    "typer>=0.12",
+]
+
+[project.scripts]
+ragbench = "ragbench.cli:app"

@@ -1,0 +1,14 @@
+# Keep the build context (and image) small: host-mounted data, secrets, and
+# local cruft must never be copied into the image.
+.git
+.venv
+.env
+inputs/
+outputs/
+test_questions.json
+__pycache__/
+*.py[oc]
+*.egg-info
+build/
+dist/
+wheels/
