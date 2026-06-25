@@ -11,7 +11,7 @@ global:
   # Parallel worker threads for `run` (questions answered + judged concurrently). 1 = serial.
   workers: 8
   defaults:
-    llm_model: openai/gpt-4.1-nano
+    llm_model: openai/gpt-5.4-nano
     embedding_model: openai/text-embedding-3-small
   # Optional per-model pricing (USD per 1M tokens) for cost estimation.
   pricing:
